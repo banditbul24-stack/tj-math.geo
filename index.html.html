@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수학 기하 작도 프로그램 (Geometric Construction Tool)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+            user-select: none;
+            overflow: hidden;
+        }
+        canvas {
+            touch-action: none;
+        }
+        .tool-btn.active {
+            background-color: #e0e7ff;
+            color: #4338ca;
+            border-color: #6366f1;
+        }
+        .board-card.active {
+            border-color: #4f46e5;
+            background-color: #f5f3ff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+        }
+        .toast-msg {
+            animation: fadeInOut 2.5s forwards;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(10px); }
+            15% { opacity: 1; transform: translateY(0); }
+            85% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-10px); }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen flex flex-col">
+
+    <header class="bg-white border-b border-slate-200 px-5 py-2.5 flex justify-between items-center z-20 shadow-sm">
+        <div class="flex items-center space-x-3">
+            <button id="btnToggleSidebar" class="p-2 rounded-lg text-slate-600 hover:bg-slate-100 transition" title="보드 목록 열기/닫기">
+                <i class="fa-solid fa-table-columns text-lg"></i>
+            </button>
+            
+            <!-- TJ MATH Custom Branding Logo -->
+            <div class="flex items-center space-x-2.5 bg-slate-900 text-white px-3 py-1.5 rounded-xl shadow-md border border-slate-800">
+                <div class="bg-indigo-500 text-white p-1.5 rounded-lg flex items-center justify-center shadow-inner">
+                    <i class="fa-solid fa-compass text-base"></i>
+                </div>
+                <div class="flex flex-col leading-none">
+                    <span class="text-xs font-black tracking-wider text-indigo-400">TJ MATH</span>
+                    <span class="text-[9px] font-medium text-slate-300">GEOMETRY STUDIO</span>
+                </div>
+            </div>
+
+            <div class="h-6 w-[1px] bg-slate-200 mx-1"></div>
+
+            <div>
+                <div class="flex items-center space-x-2">
+                    <h1 id="currentBoardTitle" class="text-base font-bold text-slate-800">그림판 1</h1>
+                    <button id="btnEditBoardName" class="text-xs text-slate-400 hover:text-indigo-600"><i class="fa-solid fa-pen"></i></button>
+                </div>
+                <p class="text-[11px] text-slate-500">인터랙티브 컴퍼스 & 패들렛 기하 작도기</p>
+            </div>
+        </div>
+
+        <!-- Instructional Banner -->
+        <div id="guideBanner" class="hidden md:flex bg-indigo-50 border border-indigo-100 text-indigo-800 px-4 py-1.5 rounded-full text-xs font-medium items-center space-x-2">
+            <i class="fa-solid fa-circle-info text-indigo-500"></i>
+            <span id="guideText">도구를 선택하여 작도를 시작하세요.</span>
+            <button id="btnResetCompassRadius" class="hidden bg-indigo-600 hover:bg-indigo-700 text-white px-2 py-0.5 rounded text-[10px] ml-2 transition">
+                너비 해제 (Esc)
+            </button>
+        </div>
+
+        <!-- Right Side Utility Controls -->
+        <div class="flex items-center space-x-2">
+            <!-- Zoom Controls -->
+            <div class="flex items-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
+                <button id="btnZoomOut" class="p-1.5 text-slate-600 hover:bg-white rounded transition" title="축소"><i class="fa-solid fa-minus text-xs"></i></button>
+                <span id="zoomLevelText" class="text-xs font-semibold px-2 text-slate-600 min-w-[45px] text-center">100%</span>
+                <button id="btnZoomIn" class="p-1.5 text-slate-600 hover:bg-white rounded transition" title="확대"><i class="fa-solid fa-plus text-xs"></i></button>
+                <button id="btnZoomReset" class="p-1.5 text-slate-500 hover:bg-white rounded text-xs transition" title="원래 크기로">리셋</button>
+            </div>
+
+            <div class="h-5 w-[1px] bg-slate-200 mx-1"></div>
+
+            <!-- History Actions -->
+            <button id="btnUndo" title="이전 작업 (Ctrl+Z)" class="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+            <button id="btnRedo" title="다시 실행 (Ctrl+Y)" class="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                <i class="fa-solid fa-rotate-right"></i>
+            </button>
+
+            <div class="h-5 w-[1px] bg-slate-200 mx-1"></div>
+
+            <!-- Upload & Delete Image / Save File -->
+            <label class="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer transition flex items-center space-x-1" title="이미지 불러오기">
+                <i class="fa-solid fa-image"></i>
+                <span class="text-xs font-semibold hidden sm:inline">이미지</span>
+                <input type="file" id="imageLoader" accept="image/*" class="hidden">
+            </label>
+
+            <button id="btnDeleteSelected" title="선택한 이미지 삭제 (Delete)" class="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:cursor-not-allowed transition">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+
+            <!-- In-App Board Save Button -->
+            <button id="btnSaveBoard" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-medium text-xs transition flex items-center space-x-1.5 shadow-sm">
+                <i class="fa-solid fa-floppy-disk"></i>
+                <span>사이트 내 저장</span>
+            </button>
+
+            <!-- PNG Download Button -->
+            <button id="btnDownloadPNG" class="bg-indigo-600 hover:bg-indigo-700 text-white p-2 rounded-lg font-medium text-xs transition flex items-center shadow-sm" title="PNG 이미지 다운로드">
+                <i class="fa-solid fa-download"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+
+        <!-- Padlet Board Sidebar -->
+        <aside id="boardSidebar" class="w-72 bg-white border-r border-slate-200 flex flex-col z-20 transition-all duration-300">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-grip-vertical text-slate-400"></i>
+                    <h2 class="font-bold text-sm text-slate-700">내 보드 목록 (Padlet)</h2>
+                </div>
+                <button id="btnNewBoard" class="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 p-1.5 rounded-lg text-xs font-bold flex items-center space-x-1 transition">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>새 보드</span>
+                </button>
+            </div>
+
+            <!-- Board List Scroll Container -->
+            <div id="boardListContainer" class="flex-1 overflow-y-auto p-3 space-y-3">
+                <!-- Dynamically populated Board Cards -->
+            </div>
+
+            <!-- Auto-save notification -->
+            <div class="p-3 border-t border-slate-100 bg-slate-50 text-[11px] text-slate-400 flex items-center justify-between">
+                <span><i class="fa-solid fa-cloud text-indigo-400 mr-1"></i>실시간 자동 저장 중</span>
+                <span id="lastSavedTime" class="font-mono">방금 전</span>
+            </div>
+        </aside>
+
+        <!-- Main Tool Palette Sidebar -->
+        <aside class="w-16 bg-white border-r border-slate-200 flex flex-col items-center py-3 space-y-3 z-10">
+            <button data-tool="select" class="tool-btn w-11 h-11 rounded-xl flex flex-col items-center justify-center text-slate-600 border border-transparent hover:bg-slate-100 transition active" title="선택 및 이미지 크기조절/이동">
+                <i class="fa-solid fa-arrow-pointer text-base"></i>
+                <span class="text-[9px] mt-0.5 font-medium">선택</span>
+            </button>
+
+            <button data-tool="pan" class="tool-btn w-11 h-11 rounded-xl flex flex-col items-center justify-center text-slate-600 border border-transparent hover:bg-slate-100 transition" title="화면 이동 (Pan)">
+                <i class="fa-solid fa-hand text-base"></i>
+                <span class="text-[9px] mt-0.5 font-medium">이동</span>
+            </button>
+
+            <button data-tool="point" class="tool-btn w-11 h-11 rounded-xl flex flex-col items-center justify-center text-slate-600 border border-transparent hover:bg-slate-100 transition" title="점 찍기">
+                <i class="fa-solid fa-circle text-xs"></i>
+                <span class="text-[9px] mt-0.5 font-medium">점</span>
+            </button>
+
+            <button data-tool="segment" class="tool-btn w-11 h-11 rounded-xl flex flex-col items-center justify-center text-slate-600 border border-transparent hover:bg-slate-100 transition" title="선분 그리기">
+                <i class="fa-solid fa-slash text-sm transform -rotate-45"></i>
+                <span class="text-[9px] mt-0.5 font-medium">선분</span>
+            </button>
+
+            <button data-tool="compass" class="tool-btn w-11 h-11 rounded-xl flex flex-col items-center justify-center text-slate-600 border border-transparent hover:bg-slate-100 transition relative" title="컴퍼스">
+                <i class="fa-solid fa-compass text-base"></i>
+                <span class="text-[9px] mt-0.5 font-medium">컴퍼스</span>
+            </button>
+
+            <button data-tool="eraser" class="tool-btn w-11 h-11 rounded-xl flex flex-col items-center justify-center text-slate-600 border border-transparent hover:bg-slate-100 transition" title="지우개">
+                <i class="fa-solid fa-eraser text-base"></i>
+                <span class="text-[9px] mt-0.5 font-medium">지우개</span>
+            </button>
+
+            <div class="w-8 h-[1px] bg-slate-200 my-1"></div>
+
+            <!-- Grid Toggle -->
+            <button id="btnToggleGrid" class="w-11 h-11 rounded-xl flex flex-col items-center justify-center text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition" title="격자 눈금 토글">
+                <i class="fa-solid fa-border-all text-base"></i>
+                <span class="text-[9px] mt-0.5 font-medium">격자</span>
+            </button>
+        </aside>
+
+        <!-- Canvas Drawing Surface -->
+        <main class="flex-1 relative bg-slate-50 overflow-hidden cursor-crosshair">
+            <canvas id="mainCanvas" class="absolute inset-0 w-full h-full"></canvas>
+
+            <!-- Toast Container -->
+            <div id="toastContainer" class="absolute top-4 left-1/2 transform -translate-x-1/2 pointer-events-none z-30"></div>
+
+            <!-- Keyboard shortcut hint -->
+            <div class="absolute bottom-3 right-4 bg-white/80 backdrop-blur border border-slate-200 px-3 py-1.5 rounded-lg text-[11px] text-slate-500 shadow-sm pointer-events-none flex items-center space-x-2">
+                <span>너비 해제 <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-slate-700 font-mono">Esc</kbd></span>
+                <span>•</span>
+                <span>붙여넣기 <kbd class="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded text-slate-700 font-mono">Ctrl+V</kbd></span>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        const guideText = document.getElementById('guideText');
+        const btnResetCompassRadius = document.getElementById('btnResetCompassRadius');
+        const toastContainer = document.getElementById('toastContainer');
+
+        // Application State
+        let currentTool = 'select'; // 'select', 'pan', 'point', 'segment', 'compass', 'eraser'
+        let showGrid = true;
+
+        // View Transform (Pan & Zoom)
+        let zoomScale = 1.0;
+        let panOffset = { x: 0, y: 0 };
+        let isPanning = false;
+        let startPan = { x: 0, y: 0 };
+
+        // Multi-Board Padlet System
+        let boards = [];
+        let activeBoardId = null;
+
+        // Board Elements Data Structure
+        let points = [];        // { id, x, y, label }
+        let lines = [];         // { id, p1, p2 }
+        let arcs = [];          // { id, center, radius, startAngle, endAngle }
+        let images = [];        // { id, img, src, x, y, width, height }
+
+        // Selection & Resize State
+        let selectedImage = null;
+        let isDraggingImage = false;
+        let activeHandle = null;
+        let dragOffset = { x: 0, y: 0 };
+        let initialResizeBounds = null;
+
+        // Enhanced Compass Tool State
+        let compassStep = 0;             // 0: Select Center, 1: Drag to Set Radius, 2: Fixed Radius Ready / Drawing
+        let compassCenter = null;        // Point or Object {x, y}
+        let compassRadius = 0;          // Fixed width / radius
+        let compassRadiusLocked = false; // Persistent radius lock flag
+        let compassCurrentAngle = 0;
+        let isCompassDrawing = false;
+        let currentArcPoints = [];
+
+        // Segment Tool State
+        let segmentStartPoint = null;
+
+        // Undo / Redo Stacks
+        let historyStack = [];
+        let redoStack = [];
+
+        // Mouse Tracker
+        let mousePos = { x: 0, y: 0 };
+        let worldMousePos = { x: 0, y: 0 };
+        let hoveredPoint = null;
+
+        window.addEventListener('load', () => {
+            resizeCanvas();
+            loadFromLocalStorage();
+            requestAnimationFrame(renderLoop);
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            redraw();
+        }
+
+        function screenToWorld(sx, sy) {
+            return {
+                x: (sx - panOffset.x) / zoomScale,
+                y: (sy - panOffset.y) / zoomScale
+            };
+        }
+
+        function getImageDataUrl(img) {
+            if (img.src.startsWith('data:')) return img.src;
+            try {
+                const c = document.createElement('canvas');
+                c.width = img.naturalWidth || img.width;
+                c.height = img.naturalHeight || img.height;
+                const cx = c.getContext('2d');
+                cx.drawImage(img, 0, 0);
+                return c.toDataURL('image/png');
+            } catch (e) {
+                return img.src;
+            }
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast-msg px-4 py-2.5 rounded-xl shadow-lg text-xs font-bold text-white flex items-center space-x-2 ${type === 'success' ? 'bg-emerald-600' : 'bg-indigo-600'}`;
+            toast.innerHTML = `<i class="fa-solid fa-check-circle"></i> <span>${message}</span>`;
+            toastContainer.appendChild(toast);
+            setTimeout(() => toast.remove(), 2500);
+        }
+
+        function saveToLocalStorage(isManual = false) {
+            if (activeBoardId) {
+                const currentBoard = boards.find(b => b.id === activeBoardId);
+                if (currentBoard) {
+                    currentBoard.data = {
+                        points,
+                        lines,
+                        arcs,
+                        images: images.map(item => ({
+                            id: item.id,
+                            x: item.x,
+                            y: item.y,
+                            width: item.width,
+                            height: item.height,
+                            src: item.src || getImageDataUrl(item.img)
+                        }))
+                    };
+                }
+            }
+
+            const payload = {
+                activeBoardId,
+                boards
+            };
+            try {
+                localStorage.setItem('geo_construction_boards_v4', JSON.stringify(payload));
+                document.getElementById('lastSavedTime').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                if (isManual) {
+                    renderBoardList();
+                    showToast('사이트 내 그림판에 성공적으로 저장되었습니다!');
+                }
+            } catch (e) {
+                console.warn('LocalStorage limit exceeded during save', e);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            const raw = localStorage.getItem('geo_construction_boards_v4') || localStorage.getItem('geo_construction_boards_v3');
+            if (raw) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    boards = parsed.boards || [];
+                    activeBoardId = parsed.activeBoardId || (boards[0] ? boards[0].id : null);
+                } catch (e) {
+                    boards = [];
+                }
+            }
+
+            if (!boards || boards.length === 0) {
+                const defaultId = 'board_' + Date.now();
+                boards = [{
+                    id: defaultId,
+                    title: '기하 작도 보드 1',
+                    data: { points: [], lines: [], arcs: [], images: [] }
+                }];
+                activeBoardId = defaultId;
+            }
+
+            renderBoardList();
+            switchBoard(activeBoardId);
+        }
+
+        function renderBoardList() {
+            const container = document.getElementById('boardListContainer');
+            container.innerHTML = '';
+
+            boards.forEach(board => {
+                const isActive = board.id === activeBoardId;
+                const card = document.createElement('div');
+                card.className = `board-card p-3 rounded-xl border border-slate-200 bg-white cursor-pointer transition relative group ${isActive ? 'active' : 'hover:border-indigo-200'}`;
+                
+                card.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-xs text-slate-800 truncate max-w-[170px]">${escapeHtml(board.title)}</span>
+                        ${boards.length > 1 ? `
+                            <button data-delete-board="${board.id}" class="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition p-1" title="보드 삭제">
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <p class="text-[10px] text-slate-400">점 ${board.data?.points?.length || 0}개, 도형 ${(board.data?.lines?.length || 0) + (board.data?.arcs?.length || 0)}개, 이미지 ${board.data?.images?.length || 0}개</p>
+                `;
+
+                card.addEventListener('click', (e) => {
+                    if (e.target.closest('[data-delete-board]')) {
+                        e.stopPropagation();
+                        deleteBoard(board.id);
+                        return;
+                    }
+                    switchBoard(board.id);
+                });
+
+                container.appendChild(card);
+            });
+        }
+
+        function switchBoard(boardId) {
+            saveToLocalStorage();
+
+            activeBoardId = boardId;
+            const board = boards.find(b => b.id === boardId);
+            if (!board) return;
+
+            document.getElementById('currentBoardTitle').textContent = board.title;
+
+            points = JSON.parse(JSON.stringify(board.data.points || []));
+            lines = JSON.parse(JSON.stringify(board.data.lines || []));
+            arcs = JSON.parse(JSON.stringify(board.data.arcs || []));
+            
+            images = [];
+            if (board.data.images) {
+                board.data.images.forEach(imgData => {
+                    const img = new Image();
+                    img.src = imgData.src;
+                    img.onload = () => redraw();
+                    images.push({
+                        id: imgData.id || Date.now() + Math.random(),
+                        img,
+                        src: imgData.src,
+                        x: imgData.x,
+                        y: imgData.y,
+                        width: imgData.width,
+                        height: imgData.height
+                    });
+                });
+            }
+
+            selectedImage = null;
+            resetToolState();
+            historyStack = [];
+            redoStack = [];
+            saveHistoryState();
+            renderBoardList();
+            redraw();
+        }
+
+        function createNewBoard() {
+            const newId = 'board_' + Date.now();
+            const newBoard = {
+                id: newId,
+                title: `기하 작도 보드 ${boards.length + 1}`,
+                data: { points: [], lines: [], arcs: [], images: [] }
+            };
+            boards.push(newBoard);
+            switchBoard(newId);
+        }
+
+        function deleteBoard(boardId) {
+            if (boards.length <= 1) return;
+            if (confirm('이 보드를 삭제하시겠습니까?')) {
+                boards = boards.filter(b => b.id !== boardId);
+                if (activeBoardId === boardId) {
+                    activeBoardId = boards[0].id;
+                }
+                switchBoard(activeBoardId);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function saveHistoryState() {
+            const state = {
+                points: JSON.parse(JSON.stringify(points)),
+                lines: JSON.parse(JSON.stringify(lines)),
+                arcs: JSON.parse(JSON.stringify(arcs)),
+                images: images.map(item => ({
+                    id: item.id, x: item.x, y: item.y, width: item.width, height: item.height, src: item.src || getImageDataUrl(item.img)
+                }))
+            };
+            historyStack.push(state);
+            redoStack = [];
+            updateUndoRedoButtons();
+            saveToLocalStorage();
+        }
+
+        function restoreHistoryState(state) {
+            points = JSON.parse(JSON.stringify(state.points));
+            lines = JSON.parse(JSON.stringify(state.lines));
+            arcs = JSON.parse(JSON.stringify(state.arcs));
+            
+            images = [];
+            state.images.forEach(imgData => {
+                const img = new Image();
+                img.src = imgData.src;
+                img.onload = () => redraw();
+                images.push({
+                    id: imgData.id,
+                    img,
+                    src: imgData.src,
+                    x: imgData.x,
+                    y: imgData.y,
+                    width: imgData.width,
+                    height: imgData.height
+                });
+            });
+
+            selectedImage = null;
+            redraw();
+            saveToLocalStorage();
+        }
+
+        function undo() {
+            if (historyStack.length > 1) {
+                redoStack.push(historyStack.pop());
+                restoreHistoryState(historyStack[historyStack.length - 1]);
+            }
+            updateUndoRedoButtons();
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                const state = redoStack.pop();
+                historyStack.push(state);
+                restoreHistoryState(state);
+            }
+            updateUndoRedoButtons();
+        }
+
+        function updateUndoRedoButtons() {
+            document.getElementById('btnUndo').disabled = historyStack.length <= 1;
+            document.getElementById('btnRedo').disabled = redoStack.length === 0;
+            document.getElementById('btnDeleteSelected').disabled = !selectedImage;
+        }
+
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                const target = e.currentTarget;
+                target.classList.add('active');
+                
+                currentTool = target.dataset.tool;
+                resetToolState();
+                updateGuideText();
+            });
+        });
+
+        document.getElementById('btnToggleSidebar').addEventListener('click', () => {
+            document.getElementById('boardSidebar').classList.toggle('-ml-72');
+        });
+
+        document.getElementById('btnNewBoard').addEventListener('click', createNewBoard);
+        document.getElementById('btnSaveBoard').addEventListener('click', () => saveToLocalStorage(true));
+        
+        document.getElementById('btnEditBoardName').addEventListener('click', () => {
+            const currentBoard = boards.find(b => b.id === activeBoardId);
+            if (!currentBoard) return;
+            const newName = prompt('보드 이름을 입력하세요:', currentBoard.title);
+            if (newName && newName.trim()) {
+                currentBoard.title = newName.trim();
+                document.getElementById('currentBoardTitle').textContent = currentBoard.title;
+                renderBoardList();
+                saveToLocalStorage();
+            }
+        });
+
+        // Zoom Controls
+        document.getElementById('btnZoomIn').addEventListener('click', () => adjustZoom(1.15));
+        document.getElementById('btnZoomOut').addEventListener('click', () => adjustZoom(1 / 1.15));
+        document.getElementById('btnZoomReset').addEventListener('click', () => {
+            zoomScale = 1.0;
+            panOffset = { x: 0, y: 0 };
+            updateZoomText();
+            redraw();
+        });
+
+        function adjustZoom(factor, center = { x: canvas.width / 2, y: canvas.height / 2 }) {
+            const newScale = Math.max(0.2, Math.min(5.0, zoomScale * factor));
+            panOffset.x = center.x - (center.x - panOffset.x) * (newScale / zoomScale);
+            panOffset.y = center.y - (center.y - panOffset.y) * (newScale / zoomScale);
+            zoomScale = newScale;
+            updateZoomText();
+            redraw();
+        }
+
+        function updateZoomText() {
+            document.getElementById('zoomLevelText').textContent = `${Math.round(zoomScale * 100)}%`;
+        }
+
+        document.getElementById('btnUndo').addEventListener('click', undo);
+        document.getElementById('btnRedo').addEventListener('click', redo);
+        
+        document.getElementById('btnToggleGrid').addEventListener('click', () => {
+            showGrid = !showGrid;
+            redraw();
+        });
+
+        document.getElementById('btnDeleteSelected').addEventListener('click', deleteSelectedImage);
+        btnResetCompassRadius.addEventListener('click', resetCompassRadiusLock);
+
+        function resetCompassRadiusLock() {
+            compassRadiusLocked = false;
+            compassRadius = 0;
+            compassStep = 0;
+            compassCenter = null;
+            btnResetCompassRadius.classList.add('hidden');
+            updateGuideText();
+            redraw();
+        }
+
+        function deleteSelectedImage() {
+            if (selectedImage) {
+                images = images.filter(img => img.id !== selectedImage.id);
+                selectedImage = null;
+                saveHistoryState();
+                redraw();
+            }
+        }
+
+        // PNG Download Action
+        document.getElementById('btnDownloadPNG').addEventListener('click', () => {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = canvas.width;
+            tempCanvas.height = canvas.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            tempCtx.fillStyle = '#ffffff';
+            tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            tempCtx.drawImage(canvas, 0, 0);
+
+            const link = document.createElement('a');
+            link.download = `${document.getElementById('currentBoardTitle').textContent}_작도.png`;
+            link.href = tempCanvas.toDataURL();
+            link.click();
+        });
+
+        function resetToolState() {
+            segmentStartPoint = null;
+            if (!compassRadiusLocked) {
+                compassStep = 0;
+                compassCenter = null;
+            } else {
+                compassStep = 2; // Keep fixed radius ready if locked
+            }
+            isCompassDrawing = false;
+            currentArcPoints = [];
+            isDraggingImage = false;
+            activeHandle = null;
+        }
+
+        function updateGuideText() {
+            if (compassRadiusLocked) {
+                btnResetCompassRadius.classList.remove('hidden');
+            } else {
+                btnResetCompassRadius.classList.add('hidden');
+            }
+
+            switch(currentTool) {
+                case 'select':
+                    guideText.textContent = '이미지를 클릭하여 선택/이동하거나 모서리 핸들로 크기를 조절하세요.';
+                    break;
+                case 'pan':
+                    guideText.textContent = '마우스를 드래그하여 화면을 자유롭게 이동하세요.';
+                    break;
+                case 'point':
+                    guideText.textContent = '마우스를 클릭하여 점을 생성합니다.';
+                    break;
+                case 'segment':
+                    guideText.textContent = segmentStartPoint ? '두 번째 점을 클릭하여 선분을 완결하세요.' : '선분의 첫 번째 점을 클릭하세요.';
+                    break;
+                case 'compass':
+                    if (compassRadiusLocked) {
+                        guideText.textContent = `[너비 고정: ${Math.round(compassRadius)}px] 점선 가이드를 보며 드래그하여 작도하거나, 중심을 눌러 컴퍼스를 이동하세요.`;
+                    } else {
+                        if (compassStep === 0) guideText.textContent = '1단계: 컴퍼스의 고정 중심이 될 점을 클릭하세요.';
+                        else if (compassStep === 1) guideText.textContent = '2단계: 마우스를 움직여 너비를 정하고 클릭하여 너비를 고정하세요.';
+                        else if (compassStep === 2) guideText.textContent = '3단계: 점선 가이드 원을 따라 마우스를 드래그하면 연필로 작도됩니다.';
+                    }
+                    break;
+                case 'eraser':
+                    guideText.textContent = '지우고 싶은 도형 요소 위를 클릭하거나 드래그하세요.';
+                    break;
+            }
+        }
+
+        function addImageToCanvas(dataUrl) {
+            const img = new Image();
+            img.onload = () => {
+                const aspect = (img.naturalWidth || img.width) / (img.naturalHeight || img.height || 1);
+                const w = Math.min(320, canvas.width * 0.4);
+                const h = w / aspect;
+                const center = screenToWorld(canvas.width / 2, canvas.height / 2);
+                
+                const newImg = {
+                    id: Date.now() + Math.random(),
+                    img,
+                    src: dataUrl,
+                    x: center.x - w / 2,
+                    y: center.y - h / 2,
+                    width: w,
+                    height: h
+                };
+                images.push(newImg);
+                selectedImage = newImg;
+                saveHistoryState();
+                redraw();
+            };
+            img.src = dataUrl;
+        }
+
+        document.getElementById('imageLoader').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => addImageToCanvas(event.target.result);
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Clipboard Paste Listener (Ctrl + V)
+        window.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => addImageToCanvas(event.target.result);
+                    reader.readAsDataURL(blob);
+                }
+            }
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+            adjustZoom(zoomFactor, { x: e.clientX, y: e.clientY });
+        }, { passive: false });
+
+        function getResizeHandles(img) {
+            const hSize = 8 / zoomScale;
+            return {
+                nw: { x: img.x, y: img.y, size: hSize, cursor: 'nwse-resize' },
+                ne: { x: img.x + img.width, y: img.y, size: hSize, cursor: 'nesw-resize' },
+                sw: { x: img.x, y: img.y + img.height, size: hSize, cursor: 'nesw-resize' },
+                se: { x: img.x + img.width, y: img.y + img.height, size: hSize, cursor: 'nwse-resize' },
+                n:  { x: img.x + img.width / 2, y: img.y, size: hSize, cursor: 'ns-resize' },
+                s:  { x: img.x + img.width / 2, y: img.y + img.height, size: hSize, cursor: 'ns-resize' },
+                w:  { x: img.x, y: img.y + img.height / 2, size: hSize, cursor: 'ew-resize' },
+                e:  { x: img.x + img.width, y: img.y + img.height / 2, size: hSize, cursor: 'ew-resize' }
+            };
+        }
+
+        function checkResizeHandleHit(pos, img) {
+            if (!img) return null;
+            const handles = getResizeHandles(img);
+            for (const [key, handle] of Object.entries(handles)) {
+                if (Math.abs(pos.x - handle.x) <= handle.size * 1.2 &&
+                    Math.abs(pos.y - handle.y) <= handle.size * 1.2) {
+                    return key;
+                }
+            }
+            return null;
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            worldMousePos = screenToWorld(mousePos.x, mousePos.y);
+
+            // Screen Pan Handle
+            if (isPanning) {
+                panOffset.x = mousePos.x - startPan.x;
+                panOffset.y = mousePos.y - startPan.y;
+                redraw();
+                return;
+            }
+
+            // Image Resizing Drag
+            if (activeHandle && selectedImage && initialResizeBounds) {
+                const dx = worldMousePos.x - dragOffset.x;
+                const dy = worldMousePos.y - dragOffset.y;
+                const b = initialResizeBounds;
+
+                if (activeHandle.includes('e')) selectedImage.width = Math.max(20, b.width + dx);
+                if (activeHandle.includes('s')) selectedImage.height = Math.max(20, b.height + dy);
+                if (activeHandle.includes('w')) {
+                    const newW = Math.max(20, b.width - dx);
+                    selectedImage.x = b.x + (b.width - newW);
+                    selectedImage.width = newW;
+                }
+                if (activeHandle.includes('n')) {
+                    const newH = Math.max(20, b.height - dy);
+                    selectedImage.y = b.y + (b.height - newH);
+                    selectedImage.height = newH;
+                }
+                redraw();
+                return;
+            }
+
+            // Image Position Dragging
+            if (isDraggingImage && selectedImage) {
+                selectedImage.x = worldMousePos.x - dragOffset.x;
+                selectedImage.y = worldMousePos.y - dragOffset.y;
+                redraw();
+                return;
+            }
+
+            // Hover Cursor
+            if (currentTool === 'select' && selectedImage) {
+                const handleHit = checkResizeHandleHit(worldMousePos, selectedImage);
+                if (handleHit) {
+                    const handles = getResizeHandles(selectedImage);
+                    canvas.style.cursor = handles[handleHit].cursor;
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            } else {
+                canvas.style.cursor = 'crosshair';
+            }
+
+            hoveredPoint = findNearestPoint(worldMousePos);
+
+            // Compass dynamic arc tracing with pencil tip
+            if (currentTool === 'compass' && compassStep === 2 && compassCenter) {
+                const angle = Math.atan2(worldMousePos.y - compassCenter.y, worldMousePos.x - compassCenter.x);
+                compassCurrentAngle = angle;
+
+                if (isCompassDrawing) {
+                    currentArcPoints.push(angle);
+                }
+            }
+
+            // Continuous Eraser Drag
+            if (currentTool === 'eraser' && e.buttons === 1) {
+                eraseAt(worldMousePos);
+            }
+
+            redraw();
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            worldMousePos = screenToWorld(mousePos.x, mousePos.y);
+
+            // Middle Click or Pan Tool active -> Screen Pan Mode
+            if (e.button === 1 || currentTool === 'pan') {
+                isPanning = true;
+                startPan = { x: mousePos.x - panOffset.x, y: mousePos.y - panOffset.y };
+                return;
+            }
+
+            if (currentTool === 'select') {
+                if (selectedImage) {
+                    const handleHit = checkResizeHandleHit(worldMousePos, selectedImage);
+                    if (handleHit) {
+                        activeHandle = handleHit;
+                        dragOffset = { x: worldMousePos.x, y: worldMousePos.y };
+                        initialResizeBounds = {
+                            x: selectedImage.x,
+                            y: selectedImage.y,
+                            width: selectedImage.width,
+                            height: selectedImage.height
+                        };
+                        return;
+                    }
+                }
+
+                let clickedImage = null;
+                for (let i = images.length - 1; i >= 0; i--) {
+                    const img = images[i];
+                    if (worldMousePos.x >= img.x && worldMousePos.x <= img.x + img.width &&
+                        worldMousePos.y >= img.y && worldMousePos.y <= img.y + img.height) {
+                        clickedImage = img;
+                        break;
+                    }
+                }
+
+                if (clickedImage) {
+                    selectedImage = clickedImage;
+                    isDraggingImage = true;
+                    dragOffset = {
+                        x: worldMousePos.x - clickedImage.x,
+                        y: worldMousePos.y - clickedImage.y
+                    };
+                } else {
+                    selectedImage = null;
+                }
+                updateUndoRedoButtons();
+            } else if (currentTool === 'point') {
+                createPoint(worldMousePos.x, worldMousePos.y);
+                saveHistoryState();
+            } else if (currentTool === 'segment') {
+                const clickedPt = createPoint(worldMousePos.x, worldMousePos.y);
+                if (!segmentStartPoint) {
+                    segmentStartPoint = clickedPt;
+                } else {
+                    if (segmentStartPoint.id !== clickedPt.id) {
+                        lines.push({
+                            id: Date.now(),
+                            p1: segmentStartPoint,
+                            p2: clickedPt
+                        });
+                        saveHistoryState();
+                    }
+                    segmentStartPoint = null;
+                }
+                updateGuideText();
+            } else if (currentTool === 'compass') {
+                handleCompassMouseDown(worldMousePos);
+            } else if (currentTool === 'eraser') {
+                eraseAt(worldMousePos);
+            }
+
+            redraw();
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (isPanning) isPanning = false;
+
+            if (activeHandle) {
+                activeHandle = null;
+                initialResizeBounds = null;
+                saveHistoryState();
+            }
+
+            if (isDraggingImage) {
+                isDraggingImage = false;
+                saveHistoryState();
+            }
+
+            if (currentTool === 'compass' && compassStep === 2 && isCompassDrawing) {
+                isCompassDrawing = false;
+                commitCompassArc();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+                deleteSelectedImage();
+            }
+
+            if (e.key === 'Escape') {
+                resetCompassRadiusLock();
+            }
+
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'z' || e.key === 'Z') {
+                    e.preventDefault();
+                    if (e.shiftKey) redo();
+                    else undo();
+                } else if (e.key === 'y' || e.key === 'Y') {
+                    e.preventDefault();
+                    redo();
+                }
+            }
+        });
+
+        function findNearestPoint(pos, threshold = 15) {
+            let nearest = null;
+            let minDist = threshold / zoomScale;
+            for (const p of points) {
+                const dist = Math.hypot(p.x - pos.x, p.y - pos.y);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearest = p;
+                }
+            }
+            return nearest;
+        }
+
+        function createPoint(x, y) {
+            const existing = findNearestPoint({ x, y }, 12);
+            if (existing) return existing;
+            
+            const newPoint = {
+                id: Date.now() + Math.random(),
+                x,
+                y,
+                label: String.fromCharCode(65 + (points.length % 26))
+            };
+            points.push(newPoint);
+            return newPoint;
+        }
+
+        function handleCompassMouseDown(pos) {
+            const hitPoint = findNearestPoint(pos, 18);
+
+            // Rule 1: If compass radius is locked and user clicks on fixed center point -> Pick up compass with fixed width
+            if (compassRadiusLocked && compassCenter && hitPoint && hitPoint.id === compassCenter.id) {
+                // Detach compass center to allow picking up and moving with the fixed width
+                compassCenter = null;
+                compassStep = 0;
+                updateGuideText();
+                return;
+            }
+
+            // Rule 2: If compass step = 0 (Selecting center)
+            if (compassStep === 0) {
+                compassCenter = hitPoint ? hitPoint : createPoint(pos.x, pos.y);
+                
+                if (compassRadiusLocked) {
+                    // Radius already locked from previous measurement -> Immediately ready to draw around new center
+                    compassStep = 2;
+                } else {
+                    compassStep = 1; // Proceed to set radius
+                }
+                updateGuideText();
+                return;
+            }
+
+            // Rule 3: Setting radius (Step 1)
+            if (compassStep === 1) {
+                if (hitPoint && hitPoint.id !== compassCenter.id) {
+                    compassRadius = Math.hypot(hitPoint.x - compassCenter.x, hitPoint.y - compassCenter.y);
+                } else {
+                    compassRadius = Math.hypot(pos.x - compassCenter.x, pos.y - compassCenter.y);
+                }
+                
+                if (compassRadius > 5) {
+                    compassStep = 2;
+                    compassRadiusLocked = true; // Fix radius
+                    updateGuideText();
+                }
+                return;
+            }
+
+            // Rule 4: Fixed Width Ready -> Pencil Arc Drawing Trigger (Step 2)
+            if (compassStep === 2 && compassCenter) {
+                isCompassDrawing = true;
+                const angle = Math.atan2(pos.y - compassCenter.y, pos.x - compassCenter.x);
+                currentArcPoints = [angle];
+            }
+        }
+
+        function commitCompassArc() {
+            if (currentArcPoints.length > 1) {
+                let minA = Math.min(...currentArcPoints);
+                let maxA = Math.max(...currentArcPoints);
+
+                if (maxA - minA > Math.PI * 1.8) {
+                    minA = 0;
+                    maxA = Math.PI * 2;
+                }
+
+                arcs.push({
+                    id: Date.now(),
+                    center: { x: compassCenter.x, y: compassCenter.y },
+                    radius: compassRadius,
+                    startAngle: minA,
+                    endAngle: maxA
+                });
+                saveHistoryState();
+            }
+            currentArcPoints = [];
+            updateGuideText();
+        }
+
+        function eraseAt(pos) {
+            const radius = 18 / zoomScale;
+            let modified = false;
+
+            const initPtCount = points.length;
+            points = points.filter(p => Math.hypot(p.x - pos.x, p.y - pos.y) > radius);
+            if (points.length !== initPtCount) modified = true;
+
+            const initLineCount = lines.length;
+            lines = lines.filter(line => pointToSegmentDistance(pos, line.p1, line.p2) > radius);
+            if (lines.length !== initLineCount) modified = true;
+
+            const initArcCount = arcs.length;
+            arcs = arcs.filter(arc => {
+                const distToCenter = Math.hypot(pos.x - arc.center.x, pos.y - arc.center.y);
+                return Math.abs(distToCenter - arc.radius) > radius;
+            });
+            if (arcs.length !== initArcCount) modified = true;
+
+            if (modified) saveHistoryState();
+        }
+
+        function pointToSegmentDistance(p, v, w) {
+            const l2 = Math.hypot(v.x - w.x, v.y - w.y) ** 2;
+            if (l2 === 0) return Math.hypot(p.x - v.x, p.y - v.y);
+            let t = ((p.x - v.x) * (w.x - v.x) + (p.y - v.y) * (w.y - v.y)) / l2;
+            t = Math.max(0, Math.min(1, t));
+            return Math.hypot(p.x - (v.x + t * (w.x - v.x)), p.y - (v.y + t * (w.y - v.y)));
+        }
+
+        function renderLoop() {
+            redraw();
+            requestAnimationFrame(renderLoop);
+        }
+
+        function redraw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.save();
+            ctx.translate(panOffset.x, panOffset.y);
+            ctx.scale(zoomScale, zoomScale);
+
+            if (showGrid) drawGrid();
+
+            // Draw Images
+            images.forEach(imgObj => {
+                if (imgObj.img.complete) {
+                    ctx.drawImage(imgObj.img, imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+                }
+
+                if (selectedImage && selectedImage.id === imgObj.id) {
+                    ctx.strokeStyle = '#4f46e5';
+                    ctx.lineWidth = 2 / zoomScale;
+                    ctx.setLineDash([6 / zoomScale, 6 / zoomScale]);
+                    ctx.strokeRect(imgObj.x, imgObj.y, imgObj.width, imgObj.height);
+                    ctx.setLineDash([]);
+
+                    const handles = getResizeHandles(imgObj);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = '#4f46e5';
+                    ctx.lineWidth = 2 / zoomScale;
+
+                    Object.values(handles).forEach(h => {
+                        ctx.beginPath();
+                        ctx.arc(h.x, h.y, h.size / 2, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                    });
+                }
+            });
+
+            // Draw Fixed Arcs / Circles
+            arcs.forEach(arc => {
+                ctx.beginPath();
+                ctx.arc(arc.center.x, arc.center.y, arc.radius, arc.startAngle, arc.endAngle);
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 2 / zoomScale;
+                ctx.stroke();
+            });
+
+            // Draw Active Arc Drawing Trace Preview
+            if (currentTool === 'compass' && compassStep === 2 && currentArcPoints.length > 1 && compassCenter) {
+                let minA = Math.min(...currentArcPoints);
+                let maxA = Math.max(...currentArcPoints);
+                ctx.beginPath();
+                ctx.arc(compassCenter.x, compassCenter.y, compassRadius, minA, maxA);
+                ctx.strokeStyle = '#4f46e5';
+                ctx.lineWidth = 2.5 / zoomScale;
+                ctx.stroke();
+            }
+
+            // Draw Line Segments
+            lines.forEach(line => {
+                ctx.beginPath();
+                ctx.moveTo(line.p1.x, line.p1.y);
+                ctx.lineTo(line.p2.x, line.p2.y);
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2 / zoomScale;
+                ctx.stroke();
+            });
+
+            // Draw Active Segment Preview
+            if (currentTool === 'segment' && segmentStartPoint) {
+                ctx.beginPath();
+                ctx.moveTo(segmentStartPoint.x, segmentStartPoint.y);
+                ctx.lineTo(worldMousePos.x, worldMousePos.y);
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 1.5 / zoomScale;
+                ctx.setLineDash([5 / zoomScale, 5 / zoomScale]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // Draw Points
+            points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5 / zoomScale, 0, Math.PI * 2);
+                ctx.fillStyle = '#4f46e5';
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5 / zoomScale;
+                ctx.stroke();
+
+                ctx.fillStyle = '#475569';
+                ctx.font = `${12 / zoomScale}px Pretendard, sans-serif`;
+                ctx.fillText(p.label, p.x + (8 / zoomScale), p.y - (8 / zoomScale));
+            });
+
+            // Highlight Hovered Point
+            if (hoveredPoint) {
+                ctx.beginPath();
+                ctx.arc(hoveredPoint.x, hoveredPoint.y, 9 / zoomScale, 0, Math.PI * 2);
+                ctx.strokeStyle = '#6366f1';
+                ctx.lineWidth = 2 / zoomScale;
+                ctx.stroke();
+            }
+
+            // Draw Interactive Compass & Auxiliary Guide Circle
+            if (currentTool === 'compass') {
+                renderCompassVisual();
+            }
+
+            ctx.restore();
+        }
+
+        function drawGrid() {
+            const gridSize = 30;
+            const startX = -panOffset.x / zoomScale;
+            const startY = -panOffset.y / zoomScale;
+            const endX = startX + canvas.width / zoomScale;
+            const endY = startY + canvas.height / zoomScale;
+
+            const firstGridX = Math.floor(startX / gridSize) * gridSize;
+            const firstGridY = Math.floor(startY / gridSize) * gridSize;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 0.5 / zoomScale;
+
+            for (let x = firstGridX; x < endX; x += gridSize) {
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+            }
+            for (let y = firstGridY; y < endY; y += gridSize) {
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+            }
+            ctx.stroke();
+        }
+
+        function renderCompassVisual() {
+            // 1. Auxiliary Guide Circle when compass width is locked
+            if (compassRadiusLocked && compassCenter) {
+                ctx.beginPath();
+                ctx.arc(compassCenter.x, compassCenter.y, compassRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = '#818cf8';
+                ctx.lineWidth = 1.5 / zoomScale;
+                ctx.setLineDash([5 / zoomScale, 5 / zoomScale]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            if (compassStep === 0) {
+                // Render phantom compass preview at current mouse position if radius is locked
+                if (compassRadiusLocked) {
+                    const phantomPos = worldMousePos;
+                    const pencilX = phantomPos.x + compassRadius;
+                    const pencilY = phantomPos.y;
+                    ctx.globalAlpha = 0.5;
+                    drawCompassHardware(phantomPos, { x: pencilX, y: pencilY }, compassRadius);
+                    ctx.globalAlpha = 1.0;
+                }
+                return;
+            }
+
+            const center = compassCenter;
+            let targetPos = worldMousePos;
+
+            if (compassStep === 1) {
+                ctx.beginPath();
+                ctx.moveTo(center.x, center.y);
+                ctx.lineTo(targetPos.x, targetPos.y);
+                ctx.strokeStyle = '#a5b4fc';
+                ctx.lineWidth = 1.5 / zoomScale;
+                ctx.setLineDash([4 / zoomScale, 4 / zoomScale]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                const currentR = Math.hypot(targetPos.x - center.x, targetPos.y - center.y);
+                drawCompassHardware(center, targetPos, currentR);
+            } else if (compassStep === 2 && compassCenter) {
+                const angle = compassCurrentAngle;
+                const pencilX = center.x + compassRadius * Math.cos(angle);
+                const pencilY = center.y + compassRadius * Math.sin(angle);
+                
+                drawCompassHardware(center, { x: pencilX, y: pencilY }, compassRadius);
+            }
+        }
+
+        function drawCompassHardware(needlePos, pencilPos, radius) {
+            const midX = (needlePos.x + pencilPos.x) / 2;
+            const midY = (needlePos.y + pencilPos.y) / 2;
+            const legDist = Math.hypot(pencilPos.x - needlePos.x, pencilPos.y - needlePos.y);
+            const height = Math.max(60 / zoomScale, (120 - legDist * 0.2) / zoomScale);
+
+            const angle = Math.atan2(pencilPos.y - needlePos.y, pencilPos.x - needlePos.x);
+            const hingeX = midX - height * Math.sin(angle);
+            const hingeY = midY + height * Math.cos(angle);
+
+            // Needle Leg (Steel Needle)
+            ctx.beginPath();
+            ctx.moveTo(hingeX, hingeY);
+            ctx.lineTo(needlePos.x, needlePos.y);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 6 / zoomScale;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(needlePos.x, needlePos.y, 3.5 / zoomScale, 0, Math.PI * 2);
+            ctx.fillStyle = '#0f172a';
+            ctx.fill();
+
+            // Pencil Leg (Drawing Lead Tip)
+            ctx.beginPath();
+            ctx.moveTo(hingeX, hingeY);
+            ctx.lineTo(pencilPos.x, pencilPos.y);
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 6 / zoomScale;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.arc(pencilPos.x, pencilPos.y, 4.5 / zoomScale, 0, Math.PI * 2);
+            ctx.fillStyle = '#2563eb';
+            ctx.fill();
+
+            // Top Hinge Head
+            ctx.beginPath();
+            ctx.arc(hingeX, hingeY, 9 / zoomScale, 0, Math.PI * 2);
+            ctx.fillStyle = compassRadiusLocked ? '#059669' : '#4f46e5';
+            ctx.fill();
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2 / zoomScale;
+            ctx.stroke();
+
+            // Highlight Ring on Center Pin
+            ctx.beginPath();
+            ctx.arc(needlePos.x, needlePos.y, 11 / zoomScale, 0, Math.PI * 2);
+            ctx.strokeStyle = compassRadiusLocked ? '#10b981' : '#f43f5e';
+            ctx.lineWidth = 2 / zoomScale;
+            ctx.setLineDash([3 / zoomScale, 3 / zoomScale]);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+    </script>
+</body>
+</html>
